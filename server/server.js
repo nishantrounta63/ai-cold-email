@@ -12,12 +12,11 @@ const googleAuthRoutes = require('./routes/googleAuthRoutes');
 dotenv.config();
 
 // Validate required environment variables
-const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET', 'GROQ_API_KEY'];
+const requiredEnvVars = ['MONGODB_URI', 'JWT_SECRET', 'GEMINI_API_KEY'];
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-    console.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
-    process.exit(1);
+    console.warn(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
 }
 
 // Connect to MongoDB
@@ -41,20 +40,17 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/auth/google', googleAuthRoutes);
 app.use('/api/inbox', inboxRoutes);
 
-// Absolute path to client build folder
-const __dirnamePath = path.resolve();
-const clientBuildPath = path.join(__dirnamePath, '..', 'client', 'dist');
-
-// Serve static files
-app.use(express.static(clientBuildPath));
-
-// For any route not starting with /api, send index.html
-app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(clientBuildPath, 'index.html'));
-    }
-});
-
+// Disable static file serving in production (Vercel handles it via vercel.json)
+if (process.env.NODE_ENV !== 'production') {
+    const __dirnamePath = path.resolve();
+    const clientBuildPath = path.join(__dirnamePath, '..', 'client', 'dist');
+    app.use(express.static(clientBuildPath));
+    app.get('*', (req, res) => {
+        if (!req.path.startsWith('/api')) {
+            res.sendFile(path.join(clientBuildPath, 'index.html'));
+        }
+    });
+}
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
@@ -63,6 +59,11 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+    });
+}
+
+// Export for Vercel Serverless
+module.exports = app;
